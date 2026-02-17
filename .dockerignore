@@ -4,7 +4,8 @@ __pycache__
 .env
 .venv
 venv
-/models/
+models/
+!src/models/
 cache/
 *.egg-info
 dist
