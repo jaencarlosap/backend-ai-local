@@ -1,0 +1,25 @@
+services:
+  damo:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../models:/app/models
+      - ../cache:/root/.cache/huggingface
+    environment:
+      - HF_TOKEN=${HF_TOKEN:-}
+      - DEVICE=cuda
+      - MAX_VRAM_GB=${MAX_VRAM_GB:-8.0}
+      - VRAM_THRESHOLD=${VRAM_THRESHOLD:-0.9}
+      - MODEL_CACHE_DIR=/app/models
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
