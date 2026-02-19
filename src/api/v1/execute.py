@@ -27,17 +27,85 @@ model_manager: ModelManager = None  # type: ignore
         "**Supported task types:**\n"
         "- `text` — Text generation (e.g. GPT-2, LLaMA). Params: `max_length`, `temperature`, `top_p`, `do_sample`\n"
         "- `image` — Image generation (e.g. Stable Diffusion). Params: `guidance_scale`, `num_inference_steps`, `width`, `height`\n"
-        "- `audio_tts` — Text-to-Speech (Coqui TTS). Params: `speaker_id`, `speed`\n"
-        "- `audio_stt` — Speech-to-Text (Whisper). Input: base64 audio. Params: `language`, `task`\n"
+        "- `audio_tts` — Text-to-Speech (e.g. Qwen3-TTS). Params: `speaker`, `speed`\n"
+        "- `audio_stt` — Speech-to-Text (e.g. Whisper). Input: base64 audio. Params: `language`, `task`\n"
         "- `video` — Video generation (not yet implemented)\n\n"
         "**VRAM management:** If GPU memory is insufficient, the least-recently-used model "
-        "is automatically evicted to make room."
+        "is automatically evicted to make room.\n\n"
+        "---\n\n"
+        "### Examples\n\n"
+        "**Text generation (GPT-2):**\n"
+        "```bash\n"
+        'curl -X POST http://localhost:8000/v1/execute/text \\\n'
+        '  -H "Content-Type: application/json" \\\n'
+        '  -d \'{"model_id":"gpt2","input":"The future of AI is","params":{"max_length":100,"temperature":0.7}}\'\n'
+        "```\n\n"
+        "**Image generation (Stable Diffusion):**\n"
+        "```bash\n"
+        'curl -X POST http://localhost:8000/v1/execute/image \\\n'
+        '  -H "Content-Type: application/json" \\\n'
+        '  -d \'{"model_id":"stabilityai/stable-diffusion-2-1","input":"A photo of an astronaut riding a horse on the moon","params":{"guidance_scale":7.5,"num_inference_steps":30,"width":512,"height":512}}\'\n'
+        "```\n\n"
+        "**Text-to-Speech (Qwen3-TTS):**\n"
+        "```bash\n"
+        'curl -X POST http://localhost:8000/v1/execute/audio_tts \\\n'
+        '  -H "Content-Type: application/json" \\\n'
+        '  -d \'{"model_id":"Qwen/Qwen3-TTS","input":"Today is a wonderful day to build something people love.","params":{"speaker":"Chelsie","speed":1.0}}\'\n'
+        "```\n\n"
+        "**Speech-to-Text (Whisper):**\n"
+        "```bash\n"
+        'curl -X POST http://localhost:8000/v1/execute/audio_stt \\\n'
+        '  -H "Content-Type: application/json" \\\n'
+        '  -d \'{"model_id":"openai/whisper-small","input":"<base64-encoded-audio>","params":{"language":"en","task":"transcribe"}}\'\n'
+        "```"
     ),
     response_description="Inference result with model metadata and current VRAM usage",
     responses={
         200: {
             "description": "Inference completed successfully",
             "model": ExecuteResponse,
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "text_generation": {
+                            "summary": "Text generation (GPT-2)",
+                            "value": {
+                                "model_id": "gpt2",
+                                "task_type": "text",
+                                "result": {"generated_text": "The future of AI is bright and full of possibilities..."},
+                                "vram_usage_percent": 34.5,
+                            },
+                        },
+                        "image_generation": {
+                            "summary": "Image generation (Stable Diffusion)",
+                            "value": {
+                                "model_id": "stabilityai/stable-diffusion-2-1",
+                                "task_type": "image",
+                                "result": {"image_base64": "<base64-encoded-png>", "format": "png"},
+                                "vram_usage_percent": 72.1,
+                            },
+                        },
+                        "tts": {
+                            "summary": "Text-to-Speech (Qwen3-TTS)",
+                            "value": {
+                                "model_id": "Qwen/Qwen3-TTS",
+                                "task_type": "audio_tts",
+                                "result": {"audio_base64": "<base64-encoded-wav>", "format": "wav", "sample_rate": 24000},
+                                "vram_usage_percent": 41.3,
+                            },
+                        },
+                        "stt": {
+                            "summary": "Speech-to-Text (Whisper)",
+                            "value": {
+                                "model_id": "openai/whisper-small",
+                                "task_type": "audio_stt",
+                                "result": {"text": "Hello, how are you doing today?"},
+                                "vram_usage_percent": 28.7,
+                            },
+                        },
+                    }
+                }
+            },
         },
         404: {
             "description": "Model not found on HuggingFace or download failed",

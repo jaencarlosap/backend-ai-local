@@ -90,8 +90,8 @@ app = FastAPI(
     ),
     openapi_tags=TAGS_METADATA,
     lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url=None,
+    redoc_url="/docs",
     openapi_url="/openapi.json",
 )
 

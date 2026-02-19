@@ -15,7 +15,8 @@ class ExecuteRequest(BaseModel):
         ...,
         description=(
             "Input data for the model. For text tasks, a prompt string. "
-            "For STT, base64-encoded audio. For image, a text prompt."
+            "For STT, base64-encoded audio. For image, a text prompt. "
+            "For TTS, the text to synthesize."
         ),
         json_schema_extra={"examples": ["The future of AI is"]},
     )
@@ -25,7 +26,7 @@ class ExecuteRequest(BaseModel):
             "Task-specific parameters. "
             "Text: max_length, temperature, top_p, do_sample. "
             "Image: guidance_scale, num_inference_steps, width, height. "
-            "TTS: speaker_id, speed. "
+            "TTS: speaker, speed. "
             "STT: language, task (transcribe/translate)."
         ),
         json_schema_extra={"examples": [{"max_length": 100, "temperature": 0.7}]},
@@ -43,7 +44,30 @@ class ExecuteRequest(BaseModel):
                     "input": "The future of AI is",
                     "params": {"max_length": 100, "temperature": 0.7},
                     "force_reload": False,
-                }
+                },
+                {
+                    "model_id": "stabilityai/stable-diffusion-2-1",
+                    "input": "A photo of an astronaut riding a horse on the moon",
+                    "params": {
+                        "guidance_scale": 7.5,
+                        "num_inference_steps": 30,
+                        "width": 512,
+                        "height": 512,
+                    },
+                    "force_reload": False,
+                },
+                {
+                    "model_id": "Qwen/Qwen3-TTS",
+                    "input": "Today is a wonderful day to build something people love.",
+                    "params": {"speaker": "Chelsie", "speed": 1.0},
+                    "force_reload": False,
+                },
+                {
+                    "model_id": "openai/whisper-small",
+                    "input": "<base64-encoded-audio-bytes>",
+                    "params": {"language": "en", "task": "transcribe"},
+                    "force_reload": False,
+                },
             ]
         }
     }
@@ -57,7 +81,7 @@ class ExecuteResponse(BaseModel):
         description=(
             "Inference result. Structure varies by task type: "
             "text -> {generated_text}, image -> {image_base64, format}, "
-            "tts -> {audio_base64, format}, stt -> {text}"
+            "tts -> {audio_base64, format, sample_rate}, stt -> {text}"
         ),
     )
     vram_usage_percent: float = Field(
@@ -72,7 +96,25 @@ class ExecuteResponse(BaseModel):
                     "task_type": "text",
                     "result": {"generated_text": "The future of AI is bright and full of possibilities..."},
                     "vram_usage_percent": 34.5,
-                }
+                },
+                {
+                    "model_id": "stabilityai/stable-diffusion-2-1",
+                    "task_type": "image",
+                    "result": {"image_base64": "<base64-encoded-png>", "format": "png"},
+                    "vram_usage_percent": 72.1,
+                },
+                {
+                    "model_id": "Qwen/Qwen3-TTS",
+                    "task_type": "audio_tts",
+                    "result": {"audio_base64": "<base64-encoded-wav>", "format": "wav", "sample_rate": 24000},
+                    "vram_usage_percent": 41.3,
+                },
+                {
+                    "model_id": "openai/whisper-small",
+                    "task_type": "audio_stt",
+                    "result": {"text": "Hello, how are you doing today?"},
+                    "vram_usage_percent": 28.7,
+                },
             ]
         }
     }
@@ -102,7 +144,14 @@ class ModelStatusResponse(BaseModel):
                             "state": "loaded",
                             "vram_mb": 548.0,
                             "last_used": 1708099200.0,
-                        }
+                        },
+                        {
+                            "model_id": "stabilityai/stable-diffusion-2-1",
+                            "task_type": "image",
+                            "state": "on_disk",
+                            "vram_mb": 0.0,
+                            "last_used": None,
+                        },
                     ],
                     "vram_usage_percent": 34.5,
                     "active_downloads": [],
@@ -121,7 +170,12 @@ class FetchRequest(BaseModel):
 
     model_config = {
         "json_schema_extra": {
-            "examples": [{"model_id": "gpt2"}]
+            "examples": [
+                {"model_id": "gpt2"},
+                {"model_id": "stabilityai/stable-diffusion-2-1"},
+                {"model_id": "Qwen/Qwen3-TTS"},
+                {"model_id": "openai/whisper-small"},
+            ]
         }
     }
 
@@ -138,7 +192,12 @@ class FetchResponse(BaseModel):
                     "model_id": "gpt2",
                     "path": "/app/models/gpt2",
                     "message": "Model gpt2 is available on disk",
-                }
+                },
+                {
+                    "model_id": "Qwen/Qwen3-TTS",
+                    "path": "/app/models/Qwen--Qwen3-TTS",
+                    "message": "Model Qwen/Qwen3-TTS is available on disk",
+                },
             ]
         }
     }
