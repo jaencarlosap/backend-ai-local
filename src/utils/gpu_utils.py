@@ -22,8 +22,8 @@ def _init_nvml():
 def initialize_gpu() -> str:
     if torch.cuda.is_available():
         device_name = torch.cuda.get_device_name(0)
-        total_mem = torch.cuda.get_device_properties(0).total_mem / (1024 ** 3)
-        logger.info(f"GPU detected: {device_name} ({total_mem:.1f} GB)")
+        total_memory = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
+        logger.info(f"GPU detected: {device_name} ({total_memory:.1f} GB)")
         _init_nvml()
         return "cuda"
     logger.warning("No CUDA GPU available, falling back to CPU")
@@ -39,7 +39,7 @@ def get_vram_usage_gb() -> float:
 def get_vram_total_gb() -> float:
     if not torch.cuda.is_available():
         return 0.0
-    return torch.cuda.get_device_properties(0).total_mem / (1024 ** 3)
+    return torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
 
 
 def get_vram_percent() -> float:
