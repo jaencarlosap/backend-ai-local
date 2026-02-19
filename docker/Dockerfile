@@ -7,7 +7,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.10-dev \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
