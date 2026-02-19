@@ -27,6 +27,7 @@ FROM python:3.10-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libsndfile1 \
@@ -40,6 +41,9 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 WORKDIR /app
 
 COPY src/ ./src/
+
+# Verify application modules are present
+RUN python -c "from src.models.enums import TaskType; print('src.models OK')"
 
 RUN mkdir -p /app/models
 
