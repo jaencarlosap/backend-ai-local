@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+import threading
 from typing import Any, Dict, Optional
 
 from src.core.download_manager import DownloadManager
@@ -15,16 +15,16 @@ class ModelManager:
     def __init__(self):
         self.vram_manager = VRAMManager()
         self.download_manager = DownloadManager()
-        self._lock = asyncio.Lock()
+        self._lock = threading.Lock()
         self._model_registry: Dict[str, ModelInfo] = {}
 
-    async def load_model(
+    def load_model(
         self,
         model_id: str,
         task_type: TaskType,
         force_reload: bool = False,
     ) -> ModelInfo:
-        async with self._lock:
+        with self._lock:
             existing = self._model_registry.get(model_id)
             if existing and existing.state == ModelState.LOADED and not force_reload:
                 existing.touch()
@@ -40,9 +40,9 @@ class ModelManager:
             self._model_registry[model_id] = info
 
         # Download outside lock
-        disk_path = await self.download_manager.download(model_id)
+        disk_path = self.download_manager.download(model_id)
 
-        async with self._lock:
+        with self._lock:
             info = self._model_registry[model_id]
             info.disk_path = disk_path
             info.state = ModelState.ON_DISK
@@ -56,9 +56,9 @@ class ModelManager:
             if not self.vram_manager.can_load_model(required_gb):
                 self.vram_manager.evict_lru(required_gb)
 
-            # Load model (blocking — run in thread)
+            # Load model
             try:
-                await asyncio.to_thread(engine.load, disk_path)
+                engine.load(disk_path)
             except Exception as e:
                 info.state = ModelState.FAILED
                 logger.error(f"Failed to load {model_id}: {e}")
@@ -71,7 +71,7 @@ class ModelManager:
             self.vram_manager.register_model(info)
             return info
 
-    async def infer(
+    def infer(
         self,
         model_id: str,
         task_type: TaskType,
@@ -79,10 +79,8 @@ class ModelManager:
         params: Dict[str, Any],
         force_reload: bool = False,
     ) -> Any:
-        info = await self.load_model(model_id, task_type, force_reload)
-        result = await asyncio.to_thread(
-            info.engine_instance.infer, input_data, params
-        )
+        info = self.load_model(model_id, task_type, force_reload)
+        result = info.engine_instance.infer(input_data, params)
         self.vram_manager.update_access_time(model_id)
         return result
 
@@ -102,11 +100,11 @@ class ModelManager:
                 statuses.append(cached)
         return statuses
 
-    async def purge_all(self):
-        async with self._lock:
+    def purge_all(self):
+        with self._lock:
             self.vram_manager.purge_all()
             self._model_registry.clear()
             logger.info("All models purged")
 
-    async def fetch_model(self, model_id: str) -> str:
-        return await self.download_manager.download(model_id)
+    def fetch_model(self, model_id: str) -> str:
+        return self.download_manager.download(model_id)

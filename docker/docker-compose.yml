@@ -1,10 +1,8 @@
 services:
   damo:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
+    image: damo:latest    # built via: bentoml build && bentoml containerize damo:latest
     ports:
-      - "${PORT:-8000}:8000"
+      - "${PORT:-3000}:3000"    # BentoML default port
     volumes:
       - models:/app/models
       - hf-cache:/root/.cache/huggingface
@@ -13,6 +11,7 @@ services:
         required: false
     environment:
       - DEVICE=cuda
+      - MODEL_CACHE_DIR=/app/models
     deploy:
       resources:
         reservations:
@@ -22,11 +21,11 @@ services:
               capabilities: [gpu]
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3000/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 60s
     logging:
       driver: json-file
       options:

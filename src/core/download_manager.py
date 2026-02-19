@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import asyncio
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Dict, List, Optional, Set
@@ -48,7 +48,7 @@ class DownloadManager:
         except Exception as e:
             raise DownloadError(model_id, str(e))
 
-    async def download(self, model_id: str) -> str:
+    def download(self, model_id: str) -> str:
         if self.is_cached(model_id):
             logger.info(f"Model {model_id} found in disk cache")
             return str(self._model_disk_path(model_id))
@@ -56,16 +56,13 @@ class DownloadManager:
         if model_id in self._active_downloads:
             logger.info(f"Download already in progress for {model_id}")
             while model_id in self._active_downloads:
-                await asyncio.sleep(1)
+                time.sleep(1)
             return str(self._model_disk_path(model_id))
 
         self._active_downloads.add(model_id)
         logger.info(f"Starting download: {model_id}")
         try:
-            loop = asyncio.get_event_loop()
-            path = await loop.run_in_executor(
-                self._executor, self._download_sync, model_id
-            )
+            path = self._download_sync(model_id)
             logger.info(f"Download complete: {model_id}")
             return path
         finally:

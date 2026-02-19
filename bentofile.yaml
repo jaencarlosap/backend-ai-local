@@ -1,0 +1,19 @@
+service: "service:DAMOService"
+labels:
+  project: damo
+include:
+  - "service.py"
+  - "src/**/*.py"
+  - "requirements.txt"
+python:
+  requirements_txt: "requirements.txt"
+  lock_packages: false
+docker:
+  system_packages:
+    - ffmpeg
+    - libsndfile1
+  cuda_version: "11.8"
+  python_version: "3.10"
+  env:
+    - PYTHONPATH=/home/bentoml/bento/src
+    - PYTHONUNBUFFERED=1

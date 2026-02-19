@@ -1,18 +1,19 @@
 # DAMO — Dynamic AI Model Orchestrator
 
-Unified REST API for running multimodal AI inference (Text, Image, Audio, Video) on consumer-grade GPUs. Models are downloaded on-demand from HuggingFace and managed in VRAM with automatic LRU eviction.
+Unified REST API for running multimodal AI inference (Text, Image, Audio, Video) on consumer-grade GPUs. Models are downloaded on-demand from HuggingFace and managed in VRAM with automatic LRU eviction. Built on [BentoML](https://docs.bentoml.com/) for GPU-aware containerization and serving.
 
 ## Features
 
 - **On-demand model loading** — Models download from HuggingFace on first request and are cached to disk.
 - **VRAM management** — LRU eviction at a configurable threshold (default 90%) keeps your GPU from running out of memory.
 - **Multimodal** — Text generation, image generation, text-to-speech, speech-to-text, and video (planned).
-- **Swagger docs** — Interactive API documentation at `/docs` (Swagger UI) and `/redoc` (ReDoc).
+- **BentoML serving** — Built-in containerization, GPU-aware image building, and production-ready serving infrastructure.
 
 ## Prerequisites
 
-- [Docker](https://docs.docker.com/get-docker/) (>= 20.10)
-- [Docker Compose](https://docs.docker.com/compose/install/) (v2)
+- Python 3.10+
+- [Docker](https://docs.docker.com/get-docker/) (>= 20.10) — for containerized deployment
+- [Docker Compose](https://docs.docker.com/compose/install/) (v2) — for containerized deployment
 - [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) (for GPU support)
 - An NVIDIA GPU with CUDA-compatible drivers
 
@@ -39,21 +40,22 @@ Edit `.env` to set your values:
 
 ### 2. Run with Docker Compose (recommended)
 
+Build the BentoML image first, then deploy with Compose:
+
 ```bash
-docker compose -f docker/docker-compose.yml up --build
+# Build the Bento and containerize it
+bentoml build
+bentoml containerize damo:latest --image-tag damo:latest
+
+# Start with Docker Compose
+docker compose -f docker/docker-compose.yml up -d
 ```
 
 This will:
-- Build the Docker image with CUDA 12.1 + Python 3.10
-- Start the API server on port **8000**
+- Use the BentoML-built Docker image with CUDA 11.8 + Python 3.10
+- Start the API server on port **3000**
 - Mount `./models` and `./cache` as volumes so downloaded models persist across restarts
 - Reserve 1 NVIDIA GPU for the container
-
-To run in detached mode:
-
-```bash
-docker compose -f docker/docker-compose.yml up --build -d
-```
 
 To stop:
 
@@ -71,23 +73,20 @@ docker compose -f docker/docker-compose.yml logs -f
 
 If you prefer running without Compose:
 
-**Build the image:**
-
 ```bash
-docker build -t damo -f docker/Dockerfile .
-```
+# Build the Bento and containerize
+bentoml build
+bentoml containerize damo:latest --image-tag damo:latest
 
-**Run the container:**
-
-```bash
+# Run the container
 docker run -d \
   --name damo \
   --gpus 1 \
-  -p 8000:8000 \
+  -p 3000:3000 \
   -v $(pwd)/models:/app/models \
   -v $(pwd)/cache:/root/.cache/huggingface \
   --env-file .env \
-  damo
+  damo:latest
 ```
 
 **Stop and remove:**
@@ -100,7 +99,7 @@ docker stop damo && docker rm damo
 
 ```bash
 # Health check
-curl http://localhost:8000/health
+curl http://localhost:3000/health
 ```
 
 Expected response:
@@ -118,7 +117,7 @@ Expected response:
 ### Generate text
 
 ```bash
-curl -X POST http://localhost:8000/v1/execute/text \
+curl -X POST http://localhost:3000/v1/execute/text \
   -H "Content-Type: application/json" \
   -d '{
     "model_id": "gpt2",
@@ -130,7 +129,7 @@ curl -X POST http://localhost:8000/v1/execute/text \
 ### Generate an image
 
 ```bash
-curl -X POST http://localhost:8000/v1/execute/image \
+curl -X POST http://localhost:3000/v1/execute/image \
   -H "Content-Type: application/json" \
   -d '{
     "model_id": "stabilityai/stable-diffusion-2-1",
@@ -139,10 +138,34 @@ curl -X POST http://localhost:8000/v1/execute/image \
   }'
 ```
 
+### Text-to-Speech
+
+```bash
+curl -X POST http://localhost:3000/v1/execute/audio_tts \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model_id": "Qwen/Qwen3-TTS",
+    "input": "Hello, how are you?",
+    "params": {"speaker": "Chelsie", "speed": 1.0}
+  }'
+```
+
+### Speech-to-Text
+
+```bash
+curl -X POST http://localhost:3000/v1/execute/audio_stt \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model_id": "openai/whisper-small",
+    "input": "<base64-encoded-audio>",
+    "params": {"language": "en", "task": "transcribe"}
+  }'
+```
+
 ### Pre-download a model
 
 ```bash
-curl -X POST http://localhost:8000/v1/models/fetch \
+curl -X POST http://localhost:3000/v1/models/fetch \
   -H "Content-Type: application/json" \
   -d '{"model_id": "gpt2"}'
 ```
@@ -150,40 +173,28 @@ curl -X POST http://localhost:8000/v1/models/fetch \
 ### Check model status
 
 ```bash
-curl http://localhost:8000/v1/models/status
+curl http://localhost:3000/v1/models/status
 ```
 
 ### Free GPU memory
 
 ```bash
-curl -X DELETE http://localhost:8000/v1/models/purge
+curl -X POST http://localhost:3000/v1/models/purge
 ```
-
-## API Documentation
-
-Once the server is running, open your browser:
-
-| URL | Description |
-|---|---|
-| [http://localhost:8000/docs](http://localhost:8000/docs) | Swagger UI — interactive API explorer |
-| [http://localhost:8000/redoc](http://localhost:8000/redoc) | ReDoc — alternative API reference |
-| [http://localhost:8000/openapi.json](http://localhost:8000/openapi.json) | Raw OpenAPI 3.1 JSON schema |
 
 ## Project Structure
 
 ```
 backend-ai-local/
+├── service.py                   # BentoML service entry point
+├── bentofile.yaml               # BentoML build configuration
 ├── src/
-│   ├── main.py                  # FastAPI app entry point
 │   ├── config.py                # Environment settings
-│   ├── api/v1/
-│   │   ├── execute.py           # POST /v1/execute/{task_type}
-│   │   ├── models.py            # Model management endpoints
-│   │   └── schemas.py           # Request/response schemas
+│   ├── schemas.py               # Request/response Pydantic models
 │   ├── core/
 │   │   ├── model_manager.py     # Central orchestrator
 │   │   ├── vram_manager.py      # GPU memory tracking & LRU eviction
-│   │   ├── download_manager.py  # Async HuggingFace downloads
+│   │   ├── download_manager.py  # HuggingFace downloads
 │   │   └── task_router.py       # Task type → engine mapping
 │   ├── inference/
 │   │   ├── base.py              # Abstract engine interface
@@ -201,7 +212,6 @@ backend-ai-local/
 │       └── logger.py            # Logging setup
 ├── tests/
 ├── docker/
-│   ├── Dockerfile
 │   └── docker-compose.yml
 ├── requirements.txt
 ├── requirements-dev.txt
@@ -223,8 +233,10 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+bentoml serve service:DAMOService --reload
 ```
+
+The server will start on `http://localhost:3000`.
 
 ## License
 
