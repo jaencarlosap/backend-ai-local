@@ -10,7 +10,7 @@ build/
 .venv/
 venv/
 env/
-models/
+/models/
 cache/
 *.pt
 *.bin

@@ -4,12 +4,6 @@ __pycache__
 .env
 .venv
 venv
-models/*.bin
-models/*.safetensors
-models/*.pt
-models/*.onnx
-models/*.gguf
-models/*/
 cache/
 *.egg-info
 dist

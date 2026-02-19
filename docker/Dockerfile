@@ -42,9 +42,6 @@ WORKDIR /app
 
 COPY src/ ./src/
 
-# Verify application modules are present
-RUN python -c "from src.models.enums import TaskType; print('src.models OK')"
-
 RUN mkdir -p /app/models
 
 EXPOSE 8000
